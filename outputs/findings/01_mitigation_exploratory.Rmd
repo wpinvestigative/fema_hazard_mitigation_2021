@@ -1,0 +1,644 @@
+---
+title: "FEMA Hazard Mitigation projects analysis"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, warning=F, message=F}
+library(tidyverse)
+library(tidycensus)
+library(lubridate)
+library(DT)
+library(knitr)
+library(viridis)
+
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(fig.width = 8)
+knitr::opts_chunk$set(fig.height = 3)
+
+# load up cleaned up data
+mega_df <- readRDS("../../data/clean/mega_df_pt2.RDS") %>%
+  mutate(declaration_year=year(declarationDate)) %>% 
+  #filter(declaration_year>2010) %>%
+  filter(programArea=="HMGP")
+
+# import county census data (poverty, urban, race)
+county_data <- read_csv("../../data/clean/county_combined.csv")
+# import county names (whoops)
+county_names <- read_csv("../../data/clean/county_names.csv")
+
+county_data <- county_data %>% left_join(county_names)
+
+# summarize data by county
+counties_only <- mega_df %>%
+  filter(programArea=="HMGP") %>%
+  filter(programFy>=2010) %>%
+  filter(status!="Obligated") %>%
+  mutate(fipsStateCode=case_when(
+    nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+    TRUE ~ as.character(stateNumberCode)
+  )) %>%
+  mutate(months_closed=case_when(
+    months_closed < 0 ~ 0,
+    TRUE ~ months_closed
+  )) %>% 
+  mutate(fipsCountyCode=case_when(
+    nchar(countyCode)==1 ~ paste0("00", countyCode),
+    nchar(countyCode)==2 ~ paste0("0", countyCode),
+    is.na(countyCode) ~ "000",
+    TRUE ~ as.character(countyCode)
+  )) %>%
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+  group_by(GEOID, status) %>%
+  summarize(projects=n(),
+            funding=sum(projectAmount),
+            federal_funding=sum(federalShareObligated),
+            # months_approval_year
+            average_months_approval=mean(months_approval_year, na.rm=T),
+            # dateApprovede to dateClosed
+            average_months_closed=mean(months_closed, na.rm=T)) %>%
+  group_by(GEOID) %>%
+  mutate(percent_projects=round(projects/sum(projects, na.rm=T)*100,1),
+         percent_funding=round(funding/sum(funding, na.rm=T)*100,1)) %>%
+  left_join(county_data)
+
+
+# 1. What percent of money is unspent
+share1 <- mega_df %>%
+   filter(programFy>=2010) %>%
+   group_by(status) %>%
+   summarize(spent=sum(projectAmount, na.rm=T)) %>%
+   mutate(percent_money=round(spent/sum(spent, na.rm=T)*100,1))
+
+
+# 2. What percent of projects are still open
+open_closed <- mega_df %>%
+   filter(programFy>=2010) %>%
+  group_by(status) %>%
+  summarize(total=n()) %>%
+  mutate(percent_projects=round(total/sum(total, na.rm=T)*100,1))
+
+#share1 <- mega_df %>%
+#  group_by(status) %>%
+#  summarize(spent=sum(federalShareObligated, na.rm=T)) %>%
+#  mutate(percent_money=round(spent/sum(spent, na.rm=T)*100,1))
+
+# 3. What's the average wait time to approve projects after a disaster?
+timing_approval <- mega_df %>%
+  #group_by(status) %>%
+  summarize(months_approval=round(mean(months_approval, na.rm=T),1))
+
+# 4. What's the average time between approval and close?
+timing_closed <- mega_df %>%
+  #group_by(status) %>%
+  summarize(months_closed=round(mean(months_closed, na.rm=T),1))
+
+
+# 5. What's the average time between disaster and close?
+months_closed <- mega_df %>%
+  mutate(interval_disaster_closed=interval(declarationDate, dateClosed)) %>%
+  mutate(months_disaster_closed=interval_disaster_closed %/% months(1)) %>%
+  summarize(months_approval_closed=round(mean(months_disaster_closed, na.rm=T),1))
+
+months_closed <- mega_df %>%
+  mutate(interval_disaster_closed=interval(declarationDate, dateClosed)) %>%
+  mutate(months_disaster_closed=interval_disaster_closed %/% months(1)) %>%
+  mutate(closed_year=year(dateClosed)) %>% 
+  filter(closed_year>2010) %>% 
+  group_by(closed_year) %>% 
+  summarize(months_approval_closed=round(mean(months_disaster_closed, na.rm=T),1))
+```
+
+There have been `r prettyNum(nrow(mega_df), big.mark=",")` hazard mitigation projects opened by FEMA since 2010.
+
+There are still `r prettyNum(sum(is.na(mega_df$dateClosed)), big.mark=",")` still open, which is about `r round(sum(is.na(mega_df$dateClosed))/nrow(mega_df)*100,1)`% of all projects.
+
+However, $`r share1 %>% filter(status=="Approved") %>% pull(spent) %>% prettyNum(big.mark=",")` hasn't been closed out. That's about `r share1 %>% filter(status=="Approved") %>% pull(percent_money)`% hazard mitigation project money unspent. 
+
+Since 2010, only $`r share1 %>% filter(status=="Closed") %>% pull(spent) %>% prettyNum(big.mark=",")` has been spent.
+
+It takes, on average, about `r timing_approval %>% pull(months_approval)` months between a declared disaster and a mitigation project to be approved by FEMA.
+
+After a project is approved by FEMA, it takes an average of `r timing_closed %>% pull(months_closed)` months to close out a project after it's been approved. Nearly twice as long to close as it takes to approve.
+
+Overall, after a declared disaster it takes an average of `r round(months_closed /12,1)` years for a project meant to prepare for and alleviate the damages for future disasters to be fully funded and closed out. 
+
+That's a lot of time to pass. 
+
+### Projects approved annually {.tabset}
+
+There have been more projects approved this year than ever before. More than two and a half times the number of hazard mitigation projects have been approved so far this year than in all of 2012.
+
+#### Chart
+
+```{r projects_annual_chart}
+
+mega_df %>%
+  mutate(approved_year=year(dateApproved)) %>%
+  count(approved_year) %>% 
+  filter(approved_year>2010) %>% 
+  ggplot(aes(x=approved_year, y=n)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Hazard Mitigation Grants approved over time",
+       caption="Data: FEMA",
+       y="Approved",
+       x="") +
+  theme_minimal()
+
+```
+
+#### Table
+
+```{r projects_annual_table}
+mega_df %>%
+  mutate(approved_year=year(dateApproved)) %>%
+  count(approved_year) %>% 
+  filter(approved_year>2010) %>% 
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "approvals_annual",              exportOptions = list(modifier = list(page = "all"))))))
+```
+
+
+### Dollars approved for projects annually {.tabset}
+
+Project costs approved have grown exponentially-- up 876% over 10 years.
+
+#### Chart
+
+```{r project_costs_annual_chart}
+mega_df %>%
+  mutate(approved_year=year(dateApproved)) %>%
+  group_by(approved_year) %>%
+  summarize(sum=sum(projectAmount, na.rm=T)) %>% 
+  filter(approved_year>2010) %>% 
+  ggplot(aes(x=approved_year, y=sum)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Hazard Mitigation Grant money approved over time",
+       caption="Data: FEMA",
+       y="Approved sum",
+       x="") +
+  theme_minimal()
+```
+
+#### Table
+
+```{r project_costs_annual_table}
+mega_df %>%
+  mutate(approved_year=year(dateApproved)) %>%
+  group_by(approved_year) %>%
+  summarize(sum=sum(projectAmount, na.rm=T)) %>% 
+  filter(approved_year>2010) %>% 
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "approval_sums_annual",              exportOptions = list(modifier = list(page = "all"))))))
+```
+
+### Disasters that lead to approved mitigation projects {.tabset}
+
+FEMA's data only includes projects that have been approved. Only one project from a disaster in 2021 has been approved this year. There is a lag in approval.
+
+#### Chart
+
+```{r disasters_approved_chart}
+mega_df %>%
+  mutate(declaration_year=year(declarationDate)) %>%
+  filter(declaration_year>2010) %>% 
+  group_by(declaration_year) %>%
+  summarize(total=n(),
+            months_approval=round(mean(months_approval, na.rm=T),1)) %>% 
+  ggplot(aes(x=declaration_year, y=total)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Hazard Mitigation Projects approved by disaster year",
+       caption="Data: FEMA",
+       y="Approved projects",
+       x="") +
+  theme_minimal()
+```
+
+#### Table
+
+```{r disasters_approved_table}
+mega_df %>%
+  mutate(declaration_year=year(declarationDate)) %>%
+  filter(declaration_year>2010) %>% 
+  group_by(declaration_year) %>%
+  summarize(total=n(),
+            months_approval=round(mean(months_approval, na.rm=T),1)) %>% 
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "disasters_approved_table",              exportOptions = list(modifier = list(page = "all"))))))
+```
+
+
+### Time to approve projects {.tabset}
+
+Most of the time, there is an open period to apply for project funding that lasts about a year after a declared disaster, though sometimes that's extended by 3 to 6 months.
+
+
+#### Chart
+
+```{r disasters_approved_annually_chart}
+mega_df %>%
+  #mutate(year_approved=year(dateApproved)) %>% 
+  mutate(year_disaster=year(declarationDate)) %>% 
+  mutate(disaster_approval_interval=interval(declarationDate, dateApproved)) %>% 
+  mutate(months_disaster_approved=disaster_approval_interval %/% months(1)) %>% 
+  mutate(months_disaster_approved=case_when(
+    months_disaster_approved < 0 ~ 0,
+    TRUE ~ months_disaster_approved
+  )) %>% 
+  group_by(year_disaster) %>%
+  #filter(initially_approved_year>2010) %>% 
+  summarize(total=n(),
+            months_disaster_approved=round(mean(months_disaster_approved, na.rm=T),1)) %>% 
+  mutate(years=months_disaster_approved/12) %>% 
+  filter(year_disaster>2010) %>% 
+  ggplot(aes(x=year_disaster, y=years)) +
+  
+  geom_bar(position="stack", stat="identity") +
+  #facet_wrap(~still_open) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Years it took for projects to get approved",
+       subtitle="By project approval year",
+       caption="Data: FEMA",
+       y="Years",
+       x="") +
+  theme_minimal()
+```
+
+#### Table
+
+```{r disasters_approved_annually_table}
+mega_df %>%
+  mutate(year_closed=year(dateClosed)) %>% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateApproved)) %>% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+  mutate(months_disaster_closed=case_when(
+    months_disaster_closed < 0 ~ 0,
+    TRUE ~ months_disaster_closed
+  )) %>% 
+  group_by(year_closed) %>%
+  #filter(initially_approved_year>2010) %>% 
+  summarize(total=n(),
+            months_disaster_closed=round(median(months_disaster_closed, na.rm=T),1)) %>% 
+  mutate(years=months_disaster_closed/12) %>% 
+  filter(year_closed>2010) %>% 
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "disasters_closed_annually_table",              exportOptions = list(modifier = list(page = "all"))))))
+```
+
+
+### Time to close projects {.tabset}
+
+Projects that closed in 2020 took an average of 7 years to get funded and completed, one year longer than it took a decade ago. (two years longer than two decades ago).
+
+
+#### Chart
+
+```{r disasters_closed_annually_chart}
+mega_df %>%
+  mutate(year_closed=year(dateClosed)) %>% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+  mutate(months_disaster_closed=case_when(
+    months_disaster_closed < 0 ~ 0,
+    TRUE ~ months_disaster_closed
+  )) %>% 
+  group_by(year_closed) %>%
+  #filter(initially_approved_year>2010) %>% 
+  summarize(total=n(),
+            months_disaster_closed=round(mean(months_disaster_closed, na.rm=T),1)) %>% 
+  mutate(years=months_disaster_closed/12) %>% 
+  filter(year_closed>2010) %>% 
+  ggplot(aes(x=year_closed, y=years)) +
+  
+  geom_bar(position="stack", stat="identity") +
+  #facet_wrap(~still_open) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Years it took for projects to close",
+       subtitle="By project close year",
+       caption="Data: FEMA",
+       y="Years",
+       x="") +
+  theme_minimal()
+```
+
+#### Table
+
+```{r disasters_closed_annually_table}
+mega_df %>%
+  mutate(year_closed=year(dateClosed)) %>% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+  mutate(months_disaster_closed=case_when(
+    months_disaster_closed < 0 ~ 0,
+    TRUE ~ months_disaster_closed
+  )) %>% 
+  group_by(year_closed) %>%
+  #filter(initially_approved_year>2010) %>% 
+  summarize(total=n(),
+            months_disaster_closed=round(mean(months_disaster_closed, na.rm=T),1)) %>% 
+  mutate(years=months_disaster_closed/12) %>% 
+  filter(year_closed>2010) %>% 
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "disasters_closed_annually_table",              exportOptions = list(modifier = list(page = "all"))))))
+```
+
+
+### Backlog of projects {.tabset}
+
+#### Chart
+
+```{r backlog_annually_chart}
+mega_df %>%
+  mutate(initially_approved_year=year(dateApproved)) %>%
+  mutate(status = case_when(
+    is.na(dateClosed) ~ "Still Open",
+    TRUE ~ "Closed"
+  )) %>% 
+  mutate(dateClosed=case_when(
+    is.na(dateClosed) ~ mdy_hms("10-01-2021 00:00:00"),
+    TRUE ~ dateClosed
+  )) %>% 
+  mutate(initially_approved_closed_interval=interval(dateApproved, dateClosed)) %>% 
+  mutate(months_initially_approved_closed=initially_approved_closed_interval %/% months(1)) %>% 
+  mutate(months_initially_approved_closed=case_when(
+    months_initially_approved_closed < 0 ~ 0,
+    TRUE ~ months_initially_approved_closed
+  )) %>% 
+  group_by(initially_approved_year, status) %>%
+  filter(initially_approved_year>2010) %>% 
+
+  summarize(total=n(),
+            months_initially_approved_closed=round(mean(months_initially_approved_closed, na.rm=T),1)) %>% 
+  ggplot(aes(x=initially_approved_year, y=total, fill=status)) +
+  
+  geom_bar(position="stack", stat="identity") +
+  #facet_wrap(~still_open) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Share of Hazard Mitigation Projects still waiting to be closed out",
+       subtitle="By approval year",
+       caption="Data: FEMA",
+       y="Projects",
+       x="") +
+  theme_minimal()
+```
+
+```{r avg_num_months_closing, eval=F}
+mega_df %>%
+  mutate(initially_approved_year=year(dateApproved)) %>%
+  mutate(status = case_when(
+    is.na(dateClosed) ~ "Still Open",
+    TRUE ~ "Closed"
+  )) %>% 
+  mutate(dateClosed=case_when(
+    is.na(dateClosed) ~ mdy_hms("10-01-2021 00:00:00"),
+    TRUE ~ dateClosed
+  )) %>% 
+  mutate(initially_approved_closed_interval=interval(dateApproved, dateClosed)) %>% 
+  mutate(months_initially_approved_closed=initially_approved_closed_interval %/% months(1)) %>% 
+  mutate(months_initially_approved_closed=case_when(
+    months_initially_approved_closed < 0 ~ 0,
+    TRUE ~ months_initially_approved_closed
+  )) %>% 
+  group_by(initially_approved_year) %>%
+  filter(initially_approved_year>2010) %>% 
+
+  summarize(total=n(),
+            months_initially_approved_closed=round(mean(months_initially_approved_closed, na.rm=T),1)) %>% 
+  ggplot(aes(x=initially_approved_year, y=months_initially_approved_closed)) +
+  
+  geom_bar(stat="identity") +
+  #facet_wrap(~still_open) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Average number of months a project has been waiting to be closed out",
+       caption="Data: FEMA",
+       y="Months",
+       x="") +
+  theme_minimal()
+```
+
+```{r share_hmp_waiting, eval=F}
+mega_df %>%
+  mutate(initially_approved_year=year(declarationDate)) %>%
+  mutate(status = case_when(
+    is.na(dateClosed) ~ "Still Open",
+    TRUE ~ "Closed"
+  )) %>% 
+  mutate(dateClosed=case_when(
+    is.na(dateClosed) ~ mdy_hms("10-01-2021 00:00:00"),
+    TRUE ~ dateClosed
+  )) %>% 
+  mutate(initially_approved_closed_interval=interval(declarationDate, dateClosed)) %>% 
+  mutate(months_initially_approved_closed=initially_approved_closed_interval %/% months(1)) %>% 
+  mutate(months_initially_approved_closed=case_when(
+    months_initially_approved_closed < 0 ~ 0,
+    TRUE ~ months_initially_approved_closed
+  )) %>% 
+  group_by(initially_approved_year, status) %>%
+  filter(initially_approved_year>2010) %>% 
+
+  summarize(total=n(),
+            months_initially_approved_closed=round(mean(months_initially_approved_closed, na.rm=T),1)) %>% 
+  ggplot(aes(x=initially_approved_year, y=total, fill=status)) +
+  
+  geom_bar(position="stack", stat="identity") +
+  #facet_wrap(~still_open) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Share of Hazard Mitigation Projects still waiting to be closed out",
+       subtitle="By disaster declaration year",
+       caption="Data: FEMA",
+       y="Months",
+       x="") +
+  theme_minimal()
+
+```
+
+#### Table
+
+```{r disasters_closed_annually_table2}
+mega_df %>%
+  mutate(approved_year=year(dateApproved)) %>%
+  group_by(approved_year) %>%
+  filter(approved_year>2010) %>% 
+  summarize(total=n(),
+            months_closed=round(mean(months_closed, na.rm=T),1))  %>% 
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "disasters_closed_approved_table",              exportOptions = list(modifier = list(page = "all"))))))
+```
+
+### Percent of money unspent by county poverty percentiles
+
+In richer communities, half of hazard mitigation money has been spent. In poorer communities, only a third has been spent.
+
+The poorer the county (4 in the quantile), the higher the rate of unspent money. NA represents money to the state and not a county.
+
+```{r poverty_percentile}
+mega_df %>%
+  filter(programFy>=2010) %>%
+  select(-majority) %>%
+  left_join(county_data) %>%
+  mutate(pov_quantile= ntile(pctpov, 4)) %>%
+  group_by(status, pov_quantile) %>%
+  summarize(spent=sum(projectAmount, na.rm=T)) %>%
+  group_by(pov_quantile) %>% 
+  mutate(percent_money=round(spent/sum(spent, na.rm=T)*100,1)) %>% 
+  filter(status=="Closed") %>% 
+  kable(format.args = list(big.mark = ","))
+```
+
+### Counties getting no Hazard Mitigation Project money
+
+18 percent of rural communities that fell in a disaster declared zone aren't even getting any Hazard Mitigation Project money.
+
+```{r no_money}
+no_mitigation <- readRDS("../../data/clean/no_mitigtation.RDS")
+county_data_none <- county_data %>%
+  mutate(pov_quantile= ntile(pctpov, 4)) %>%
+  filter(GEOID %in% no_mitigation)
+
+total_ur <- county_data %>% 
+  count(urban_rural, name="total_counties")
+
+county_data_none %>%
+  count(urban_rural) %>% 
+  left_join(total_ur) %>% 
+  mutate(percent=round(n/total_counties*100,1)) %>% 
+  rename(counties_with_no_projects=n,
+         counties=total_counties) %>% 
+  kable()
+
+county_data_none <- county_data %>%
+  mutate(pov_quantile= ntile(pctpov, 4)) %>%
+  filter(GEOID %in% no_mitigation)
+
+total_ur <- county_data %>% 
+  count(urban_rural, name="total_counties")
+
+county_data_none %>%
+  count(urban_rural) %>% 
+  left_join(total_ur) %>% 
+  
+mutate(ur=case_when(
+    (urban_rural > 0 & urban_rural <= 2) ~ "1. Urban",
+    (urban_rural > 2 & urban_rural <= 4) ~ "2. Suburban",
+    (urban_rural > 4 & urban_rural <= 6) ~ "3. Rural",
+    TRUE ~ "4. Unclassified"
+  )) %>%
+  group_by(ur) %>% 
+  summarize(total_counties=sum(total_counties),
+            n=sum(n)) %>% 
+  filter(ur!="4. Unclassified") %>% 
+  mutate(percent=round(n/total_counties*100,1)) %>% 
+  rename(counties_with_no_projects=n,
+         counties=total_counties)
+
+# 1 - 2: 10%
+# 3 - 4: 7%
+# 5 - 6: 15%
+```
+
+### County level project status and funding
+
+
+```{r county_data}
+counties_only %>%
+  select(NAME, status, projects, funding, `federal funding`=federal_funding,
+         `average months approval`=average_months_approval,
+         `average months closed`=average_months_closed,
+         `percent projects`=percent_projects,
+         `percent funding`=percent_funding 
+         ) %>% 
+  filter(!is.na(NAME)) %>% 
+  mutate(`average months approval`=round(`average months approval`,1),
+         `average months closed`=round(`average months closed`,1)) %>% 
+
+  datatable(extensions = c("Buttons"),
+            options = list(dom = 'Bfrtip',
+                           buttons = list(list(extend = "csv", 
+                                               text = "Download Table", 
+                                               filename = "county_data",              exportOptions = list(modifier = list(page = "all"))))))
+
+counties_only %>% 
+  filter(status=="Approved" & `percent projects`==100)
+
+```
+
+### Projects closed county map
+
+```{r county_map1, fig.height=6.5, fig.width=9}
+county_map <- get_acs(geography = "county",
+                      variables = "B03002_001",
+                      survey="acs5",
+                      year=2019,
+                      geometry=T,
+                      shift_geo=T)
+
+counties_closed_map <- counties_only %>% 
+  filter(status=="Closed") %>% 
+  right_join(county_map)
+
+ggplot(counties_closed_map) +
+  #geom_sf(aes(fill=percent_projects, geometry=geometry), color="white", width=.1) +
+  geom_sf(aes(fill=percent_projects, geometry=geometry), color=NA) +
+  theme_void() +
+  scale_fill_viridis(direction=-1) +
+  #scale_fill_manual(values = c("grey", "purple")) +
+  theme(panel.grid.major = element_line(colour = 'transparent')) +
+  labs(title="Percent of Hazard Mitigation Projects closed",
+       #subtitle="During the months of June through August",
+       caption="Data: FEMA")
+```
+
+### Projects funding county map
+
+```{r county_map2, fig.height=6.5, fig.width=9}
+ggplot(counties_closed_map) +
+  #geom_sf(aes(fill=percent_funding, geometry=geometry), color="white", width=.1) +
+  geom_sf(aes(fill=percent_funding, geometry=geometry), color=NA) +
+  theme_void() +
+  scale_fill_viridis(direction=-1, option = "A") +
+  #scale_fill_manual(values = c("grey", "purple")) +
+  theme(panel.grid.major = element_line(colour = 'transparent')) +
+  labs(title="Percent of Hazard Mitigation Projects funded",
+       #subtitle="During the months of June through August",
+       caption="Data: FEMA")
+```
+
+### Projects closed timing county map
+
+```{r county_map3, fig.height=6.5, fig.width=9}
+write_csv(counties_closed_map, "../../outputs/graphics/counties_closed_map.csv", na="")
+
+ggplot(counties_closed_map) +
+  #geom_sf(aes(fill=average_months_closed, geometry=geometry), color="white", width=.1) +
+  geom_sf(aes(fill=average_months_closed, geometry=geometry), color=NA) +
+  theme_void() +
+  scale_fill_viridis(direction=-1, option = "B") +
+  #scale_fill_manual(values = c("grey", "purple")) +
+  theme(panel.grid.major = element_line(colour = 'transparent')) +
+  labs(title="Average months to close a Hazard Mitigation Project",
+       #subtitle="During the months of June through August",
+       caption="Data: FEMA")
+```

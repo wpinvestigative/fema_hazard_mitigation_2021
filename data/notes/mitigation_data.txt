@@ -1,0 +1,68 @@
+Mitigation data sources:
+
+Hazard Mitigation Plan Statuses - v1
+https://www.fema.gov/openfema-data-page/hazard-mitigation-plan-statuses-v1
+HazardMitigationPlanStatuses.csv
+
+Hazard Mitigation Grant Program - Disaster Summaries - v1
+https://www.fema.gov/openfema-data-page/hazard-mitigation-grant-program-disaster-summaries-v1
+HazardMitigationGrantProgramDisasterSummaries.csv
+
+Hazard Mitigation Assistance Projects by NFIP CRS Communities - v1
+https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-nfip-crs-communities-v1
+HazardMitigationAssistanceProjectsByNfipCrsCommunities.csv
+
+Hazard Mitigation Assistance Projects - v2*
+https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-v2
+HazardMitigationAssistanceProjects.csv
+
+Hazard Mitigation Assistance Mitigated Properties - v2
+https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-mitigated-properties-v2
+HazardMitigationAssistanceMitigatedProperties.csv
+
+
+
+# Counties with the longest average wait
+
+# Counties that requested hurricne mitigation money and got hit by hurricanes while waiting
+
+# Counties that requested fire mitigation money and got hit by hurricanes while waiting
+
+QUESTION: Should I measure between approval date and closing? Or 18 months post-disaster and approval date?
+
+QUESTION: I'm only looking at HMGP and not FMA or PDM?
+
+77 months!
+
+
+#1. Disasters happening while counties are waiting.
+- Answerable sorta. Has a lot of projects we may want to exclude?
+
+#- what am i asking?
+#- counties with the longest wait times?
+-Answerable
+
+#- counties with the most disasters during their wait time
+-Answerable. Sorta. Depends on the project type and disaster type
+
+#2. What percentage of this money is unspent and
+-Kind of answerable but is it the right methodology?
+
+#3. Equity issues in how it's distributed
+- Well, let's see if
+- Can i measure where counties are getting these state funds?
+- there might be another state type
+
+#4. pool of money
+money that's been de-obligtated
+never goes out the door at all
+
+does it get back to fema
+can we quantify it?
+
+percent of money
+
+rural urban
+not spent
+
+and amount of money
