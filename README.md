@@ -18,7 +18,7 @@ The data is pulled from OpenFEMA.
 
 # Folders of note in this repo
 
-* **[data/raw_data](data/raw_data)** - Downloaded data from the OpenFEMA
+* **[data/raw_data](data/raw)** - Downloaded data from the OpenFEMA
 
 * **[scripts/import](scripts/analysis)** - Scripts to prepare FEMA data and exploratory analysis
 
