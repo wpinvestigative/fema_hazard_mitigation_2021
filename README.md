@@ -14,7 +14,7 @@ The data is pulled from OpenFEMA.
 
 [Hazard Mitigation Assistance Projects - v2*](https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-v2)
 
-[Disaster Declarations Summaries](ttps://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2)
+[Disaster Declarations Summaries](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2)
 
 # Folders of note in this repo
 
