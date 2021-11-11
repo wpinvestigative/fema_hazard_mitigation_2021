@@ -8,15 +8,21 @@ Summary TK
 
 # Methodology
 
-The Post cleaned FEMA's Hazard Mitigation Assistance Projects data and joined it with FEMA's Disaster Declarations Summaries data to determine which designated disasters occurred between three time periods a) declared disaster date and approval date b) approval date and closed date and c) declared disaster date and closed date or October 1, 2021 if the project was still open.
+The Post cleaned FEMA's Hazard Mitigation Assistance Projects data and joined it with FEMA's Disaster Declarations Summaries data to determine which designated disasters occurred between three time periods 
+
+* declared disaster date and approval date 
+
+* approval date and closed date and 
+
+* declared disaster date and closed date or October 1, 2021 if the project was still open.
 
 # About the data
 
-The data is pulled from OpenFEMA.
+The data was pulled from OpenFEMA.
 
-[Hazard Mitigation Assistance Projects - v2*](https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-v2)
+* [Hazard Mitigation Assistance Projects - v2*](https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-v2)
 
-[Disaster Declarations Summaries](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2)
+* [Disaster Declarations Summaries](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2)
 
 # Folders of note in this repo
 
