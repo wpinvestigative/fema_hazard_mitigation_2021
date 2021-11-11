@@ -1,0 +1,401 @@
+---
+title: "FEMA Hazard Mitigation projects analysis"
+output:
+  html_document:
+    code_folding: hide
+---
+
+
+```{r setup, warning=F, message=F}
+library(tidyverse)
+library(tidycensus)
+library(lubridate)
+library(DT)
+library(knitr)
+library(viridis)
+
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(fig.width = 8)
+knitr::opts_chunk$set(fig.height = 3)
+
+# load up cleaned up data
+mega_df <- readRDS("../../data/clean/mega_df_pt2.RDS") %>%
+  mutate(declaration_year=year(declarationDate)) %>% 
+  filter(programArea=="HMGP")
+
+
+```
+
+Of the $11 billion FEMA has allocated for this program over the past decade, only $1.5 billion has been spent.
+
+```{r one}
+# 1. What percent of money is unspent
+share1 <- mega_df %>%
+   filter(programFy>2010) %>%
+    filter(programArea=="HMGP") %>%
+   group_by(status) %>%
+   summarize(spent=sum(projectAmount, na.rm=T)) %>%
+   mutate(percent_money=round(spent/sum(spent, na.rm=T)*100,1))
+
+kable(share1, format.args = list(big.mark = ","))
+```
+
+
+How long counties wait on average to complete their FEMA-funded resilience projects.
+
+Projects that closed in 2020 took an average of 7 years to get funded and completed, one year longer than it took a decade ago. 
+
+This is counting from a declared disaster dates to dates projects closed by year of closure.
+
+```{r disasters_closed_annually_chart}
+mega_df %>%
+  mutate(year_closed=year(dateClosed)) %>% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+  mutate(months_disaster_closed=case_when(
+    months_disaster_closed < 0 ~ 0,
+    TRUE ~ months_disaster_closed
+  )) %>% 
+  filter(year_closed>2010 & year_closed < 2021) %>% 
+  group_by(year_closed) %>%
+  #filter(initially_approved_year>2010) %>% 
+  summarize(total=n(),
+            months_disaster_closed=round(mean(months_disaster_closed, na.rm=T),1)) %>% 
+  mutate(years=months_disaster_closed/12) %>% 
+  filter(year_closed>2010) %>% 
+  ggplot(aes(x=year_closed, y=years)) +
+  
+  geom_bar(position="stack", stat="identity") +
+  #facet_wrap(~still_open) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title="Years it took for projects to close",
+       subtitle="By project close year",
+       caption="Data: FEMA",
+       y="Years",
+       x="") +
+  theme_minimal()
+```
+
+It takes nearly two years for projects in rural counties to get approved.
+
+```{r rural_approval}
+# import county census data (poverty, urban, race)
+county_data <- read_csv("../../data/clean/county_combined.csv") %>% 
+  mutate(pov_quantile= ntile(pctpov, 4))  %>% 
+  mutate(pop_quantile=ntile(poverty_population, 4))
+
+# import county names
+county_names <- read_csv("../../data/clean/county_names.csv")
+
+county_data <- county_data %>% left_join(county_names)
+
+mega_df %>%
+     mutate(fipsStateCode=case_when(
+         nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+         TRUE ~ as.character(stateNumberCode)
+     )) %>%
+     mutate(fipsCountyCode=case_when(
+         nchar(countyCode)==1 ~ paste0("00", countyCode),
+         nchar(countyCode)==2 ~ paste0("0", countyCode),
+         is.na(countyCode) ~ "000",
+         TRUE ~ as.character(countyCode)
+     )) %>%
+     mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+     left_join(county_data, by="GEOID") %>% 
+     mutate(ur=case_when(
+         (urban_rural > 0 & urban_rural <= 2) ~ "1. Urban",
+         (urban_rural > 2 & urban_rural <= 4) ~ "2. Suburban",
+         (urban_rural > 4 & urban_rural <= 6) ~ "3. Rural",
+         TRUE ~ "4. Unclassified"
+     )) %>%
+     mutate(initially_approved_year=year(approval_date)) %>%
+     mutate(initially_declared_approved_interval=interval(declarationDate, approval_date)) %>% 
+     mutate(months_declared_approved=initially_declared_approved_interval %/% months(1)) %>% 
+     filter(initially_approved_year>2010) %>% 
+     group_by(ur) %>%
+     summarize(total=n(),
+               costs=sum(projectAmount, na.rm=T),
+               months_declared_approved=round(mean(months_declared_approved, na.rm=T),1)) %>% 
+  filter(ur=="3. Rural") %>% 
+  kable()
+```
+
+How long it takes counties to close out projects by poverty percentile.
+
+```{r poor}
+# poor communities
+mega_df %>%
+     mutate(fipsStateCode=case_when(
+         nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+         TRUE ~ as.character(stateNumberCode)
+     )) %>%
+     mutate(fipsCountyCode=case_when(
+         nchar(countyCode)==1 ~ paste0("00", countyCode),
+         nchar(countyCode)==2 ~ paste0("0", countyCode),
+         is.na(countyCode) ~ "000",
+         TRUE ~ as.character(countyCode)
+     )) %>%
+     mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+    mutate(year_closed=year(dateClosed)) %>% 
+    mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+     left_join(county_data, by="GEOID") %>%
+     filter(year_closed>2010) %>% 
+     group_by(pov_quantile) %>%
+     summarize(total=n(),
+               costs=sum(projectAmount, na.rm=T),
+               months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1))  %>% 
+  kable()
+```
+
+How long it takes to close out projects in counties where majority of the population is either white or non-white.
+
+```{r nonwhite}
+# white or non-white
+mega_df %>%
+     mutate(fipsStateCode=case_when(
+         nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+         TRUE ~ as.character(stateNumberCode)
+     )) %>%
+     mutate(fipsCountyCode=case_when(
+         nchar(countyCode)==1 ~ paste0("00", countyCode),
+         nchar(countyCode)==2 ~ paste0("0", countyCode),
+         is.na(countyCode) ~ "000",
+         TRUE ~ as.character(countyCode)
+     )) %>%
+    mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+    mutate(year_closed=year(dateClosed)) %>% 
+    mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+    select(-majority) %>% 
+    left_join(county_data, by="GEOID") %>%
+    filter(year_closed>2010) %>% 
+    group_by(majority) %>%
+    summarize(total=n(),
+               costs=sum(projectAmount, na.rm=T),
+               months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1)) %>% 
+  filter(!is.na(majority)) %>% 
+  kable()
+```
+
+Counties with at least one project that took longer than 10 years to close out where majority of the population is either white or non-white.
+
+```{r plusten_race}
+tenplus <- mega_df %>%
+     mutate(fipsStateCode=case_when(
+         nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+         TRUE ~ as.character(stateNumberCode)
+     )) %>%
+     mutate(fipsCountyCode=case_when(
+         nchar(countyCode)==1 ~ paste0("00", countyCode),
+         nchar(countyCode)==2 ~ paste0("0", countyCode),
+         is.na(countyCode) ~ "000",
+         TRUE ~ as.character(countyCode)
+     )) %>%
+    mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+    mutate(year_closed=year(dateClosed)) %>% 
+    mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+    select(-majority) %>% 
+    left_join(county_data, by="GEOID") %>%
+    filter(months_disaster_closed>120) %>% 
+    filter(year_closed>2010)
+
+# Counties with at least one project that took longer than 10 years to close out
+tenplus %>% 
+    count(GEOID) %>% 
+    mutate(project=1) %>% 
+    right_join(county_data, by="GEOID") %>% 
+    group_by(majority) %>%
+    summarize(total=n(),
+              counties=sum(project, na.rm=T)) %>% 
+  ungroup() %>% 
+  mutate(percent_of_counties=round(counties/total*100,1)) %>% 
+  kable()
+```
+
+Counties with projects that took longer than 10 years to close out in counties by poverty quantiles.
+
+```{r plusten_pov}
+tenplus <- mega_df %>%
+     mutate(fipsStateCode=case_when(
+         nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+         TRUE ~ as.character(stateNumberCode)
+     )) %>%
+     mutate(fipsCountyCode=case_when(
+         nchar(countyCode)==1 ~ paste0("00", countyCode),
+         nchar(countyCode)==2 ~ paste0("0", countyCode),
+         is.na(countyCode) ~ "000",
+         TRUE ~ as.character(countyCode)
+     )) %>%
+    mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+    mutate(year_closed=year(dateClosed)) %>% 
+    mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+    select(-majority) %>% 
+    left_join(county_data, by="GEOID") %>%
+    filter(months_disaster_closed>120) %>% 
+    filter(year_closed>2010)
+
+tenplus %>% 
+    mutate(project=1) %>% 
+    group_by(GEOID) %>% 
+    summarize(projects=sum(project, na.rm=T)) %>%   
+    right_join(county_data, by="GEOID") %>% 
+    group_by(pov_quantile) %>%
+    summarize(total=n(),
+              counties=sum(projects, na.rm=T)) %>% 
+  filter(!is.na(pov_quantile)) %>% 
+  kable()
+```
+
+Average number of disasters affecting counties while waiting for relevant hazard mitigation projects.
+
+```{r disaster_overlap}
+project_types <- read_csv("../../data/raw/project_types.csv")
+
+mega_df <- mega_df %>%
+  left_join(project_types)
+
+mega_df <- mega_df %>%
+  mutate(incident_count=str_count(disaster_wide_type, incidentType)) 
+
+mega_df %>%
+  filter(subappType!="Management Costs") %>%
+  filter(subappType!="Planning") %>%
+  filter(programFy>2010) %>%
+  group_by(incidentType) %>%
+  summarize(average_disaster_count=mean(incident_count, na.rm=T)) %>%
+  arrange(-average_disaster_count) %>% 
+  head(3) %>% 
+  kable()
+```
+
+Disasters compared to projects by county type.
+
+
+```{r yup, fig.height=6, fig.width=8}
+
+disasters <- read_csv("../../data/raw/DisasterDeclarationsSummaries090321.csv") %>% 
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) 
+
+# import county census data (poverty, urban, race)
+county_data <- read_csv("../../data/clean/county_combined.csv") %>% 
+  mutate(pov_quantile= ntile(pctpov, 4))  %>% 
+  mutate(pop_quantile= ntile(poverty_population,4))
+# import county names (whoops)
+county_names <- read_csv("../../data/clean/county_names.csv")
+
+county_data <- county_data %>% left_join(county_names)
+
+
+county_disaster_list <- disasters %>% 
+  ungroup() %>% 
+  select(-placeCode, -designatedArea, -hash, -id) %>% 
+  unique() %>% 
+  mutate(declaration_year=year(declarationDate)) %>% 
+  filter(declaration_year>2010)
+
+write_csv(county_disaster_list, "../../data/clean/county_disaster_list_dupe.csv", na="")
+
+county_disaster_list <- read_csv("../../data/clean/county_disaster_list_dupe.csv") %>% 
+  unique()
+
+county_disaster_count <- county_disaster_list %>% 
+  count(GEOID, name="disasters") %>% 
+  full_join(county_data) %>% 
+  mutate(ur=case_when(
+    (urban_rural > 0 & urban_rural <= 2) ~ "1. Urban",
+    (urban_rural > 2 & urban_rural <= 4) ~ "2. Suburban",
+    (urban_rural > 4 & urban_rural <= 6) ~ "3. Rural",
+    TRUE ~ "4. Unclassified"
+  )) %>% 
+  filter(!is.na(NAME))
+
+county_projects_count <- mega_df %>% 
+  filter(programArea=="HMGP") %>%
+  filter(year(declarationDate)>2010) %>% 
+#  filter(is.na(dateClosed) | year(dateClosed)>2010) %>% 
+  mutate(fipsStateCode=case_when(
+    nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+    TRUE ~ as.character(stateNumberCode)
+  )) %>%
+  mutate(fipsCountyCode=case_when(
+    nchar(countyCode)==1 ~ paste0("00", countyCode),
+    nchar(countyCode)==2 ~ paste0("0", countyCode),
+    is.na(countyCode) ~ "000",
+    TRUE ~ as.character(countyCode)
+  )) %>%
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>% 
+  count(GEOID, name="projects")
+
+county_projects_disasters <- full_join(county_disaster_count, county_projects_count) %>% 
+  filter(!is.na(NAME))
+
+ggplot(county_projects_disasters, aes(x=disasters, y=projects, color=ur)) +
+  geom_point()+
+  #geom_smooth(method='lm', formula= y~x, se=FALSE) +
+  geom_abline(intercept=0, slope=1) +
+  geom_smooth(method=lm) +
+  labs(title="Number of projects versus disasters by county type") +
+  theme_minimal()
+```
+
+Urban counties are twice as likely on average to receive funding after a disaster than rural areas.
+
+```{r ratio}
+county_projects_disasters %>% 
+  mutate(ratio=projects/disasters) %>% 
+  group_by(ur) %>% 
+  summarize(average_ratio = mean(ratio, na.rm=T)) %>% 
+  kable()
+```
+
+Half of the rural communities that fell in a disaster declared zone aren't getting any Hazard Mitigation Project money.
+
+```{r no_money}
+no_mitigation <- readRDS("../../data/clean/no_mitigation.RDS")
+county_data_none <- county_data %>%
+  mutate(pov_quantile= ntile(pctpov, 4)) %>%
+  filter(GEOID %in% no_mitigation)
+
+total_ur <- county_data %>% 
+  count(urban_rural, name="total_counties")
+# 
+# county_data_none %>%
+#   count(urban_rural) %>% 
+#   left_join(total_ur) %>% 
+#   mutate(percent=round(n/total_counties*100,1)) %>% 
+#   rename(counties_with_no_projects=n,
+#          counties=total_counties) %>% 
+#   filter(!is.na(urban_rural)) %>% 
+#   kable()
+
+county_data_none <- county_data %>%
+  mutate(pov_quantile= ntile(pctpov, 4)) %>%
+  filter(GEOID %in% no_mitigation)
+
+total_ur <- county_data %>% 
+  count(urban_rural, name="total_counties")
+
+county_data_none %>%
+  count(urban_rural) %>% 
+  left_join(total_ur) %>% 
+  
+mutate(ur=case_when(
+    (urban_rural > 0 & urban_rural <= 2) ~ "1. Urban",
+    (urban_rural > 2 & urban_rural <= 4) ~ "2. Suburban",
+    (urban_rural > 4 & urban_rural <= 6) ~ "3. Rural",
+    TRUE ~ "4. Unclassified"
+  )) %>%
+  group_by(ur) %>% 
+  summarize(total_counties=sum(total_counties),
+            n=sum(n)) %>% 
+  filter(ur!="4. Unclassified") %>% 
+  mutate(percent=round(n/total_counties*100,1)) %>% 
+  rename(counties_with_no_projects=n,
+         counties=total_counties) %>% 
+  kable()
+
+```
