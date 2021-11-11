@@ -196,21 +196,21 @@ knitr::opts_chunk$set(fig.height = 3)
 mega_df &lt;- readRDS(&quot;../../data/clean/mega_df_pt2.RDS&quot;) %&gt;%
   mutate(declaration_year=year(declarationDate)) %&gt;% 
   filter(programArea==&quot;HMGP&quot;)</code></pre>
-<p>Of the $11 billion FEMA has allocated for this program over the past decade, only $1.5 billion has been spent.</p>
+<p>Of the $11 billion FEMA has allocated for this program over the past decade, only $1.6 billion has been spent.</p>
 <pre class="r"><code># 1. What percent of money is unspent
 share1 &lt;- mega_df %&gt;%
    filter(programFy&gt;2010) %&gt;%
     filter(programArea==&quot;HMGP&quot;) %&gt;%
    group_by(status) %&gt;%
-   summarize(spent=sum(projectAmount, na.rm=T)) %&gt;%
-   mutate(percent_money=round(spent/sum(spent, na.rm=T)*100,1))
+   summarize(amount=sum(projectAmount, na.rm=T)) %&gt;%
+   mutate(percent_money=round(amount/sum(amount, na.rm=T)*100,1))
 
 kable(share1, format.args = list(big.mark = &quot;,&quot;))</code></pre>
 <table>
 <thead>
 <tr class="header">
 <th align="left">status</th>
-<th align="right">spent</th>
+<th align="right">amount</th>
 <th align="right">percent_money</th>
 </tr>
 </thead>
@@ -686,8 +686,29 @@ ggplot(county_projects_disasters, aes(x=disasters, y=projects, color=ur)) +
 </tr>
 </tbody>
 </table>
-<p>Half of the rural communities that fell in a disaster declared zone aren’t getting any Hazard Mitigation Project money.</p>
-<pre class="r"><code>no_mitigation &lt;- readRDS(&quot;../../data/clean/no_mitigation.RDS&quot;)
+<p>Half of all rural counties in the U.S. experienced a disaster over the past 10 years, yet didn’t have a single mitigation project.</p>
+<pre class="r"><code>disasters_counties &lt;- read_csv(&quot;../../data/raw/DisasterDeclarationsSummaries090321.csv&quot;) %&gt;% 
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %&gt;% 
+  filter(incidentType==&quot;Biological&quot;) %&gt;% 
+  filter(year(declarationDate)&gt;2010) %&gt;% 
+  select(GEOID) %&gt;% 
+  unique()
+
+
+counties_only &lt;- mega_df %&gt;% 
+  filter(year(declarationDate)&gt;2010) %&gt;% 
+  select(GEOID) %&gt;% 
+  unique() %&gt;% 
+  left_join(county_data, by=&quot;GEOID&quot;) %&gt;% 
+  mutate(ur=case_when(
+      (urban_rural &gt; 0 &amp; urban_rural &lt;= 2) ~ &quot;1. Urban&quot;,
+      (urban_rural &gt; 2 &amp; urban_rural &lt;= 4) ~ &quot;2. Suburban&quot;,
+      (urban_rural &gt; 4 &amp; urban_rural &lt;= 6) ~ &quot;3. Rural&quot;,
+      TRUE ~ &quot;4. Unclassified&quot;
+    )) %&gt;%
+    count(ur, name=&quot;counties_with_projects&quot;)
+
+no_mitigation &lt;- readRDS(&quot;../../data/clean/no_mitigation.RDS&quot;)
 county_data_none &lt;- county_data %&gt;%
   mutate(pov_quantile= ntile(pctpov, 4)) %&gt;%
   filter(GEOID %in% no_mitigation)
@@ -714,7 +735,6 @@ total_ur &lt;- county_data %&gt;%
 county_data_none %&gt;%
   count(urban_rural) %&gt;% 
   left_join(total_ur) %&gt;% 
-  
 mutate(ur=case_when(
     (urban_rural &gt; 0 &amp; urban_rural &lt;= 2) ~ &quot;1. Urban&quot;,
     (urban_rural &gt; 2 &amp; urban_rural &lt;= 4) ~ &quot;2. Suburban&quot;,
@@ -724,18 +744,30 @@ mutate(ur=case_when(
   group_by(ur) %&gt;% 
   summarize(total_counties=sum(total_counties),
             n=sum(n)) %&gt;% 
+  left_join(counties_only) %&gt;% 
   filter(ur!=&quot;4. Unclassified&quot;) %&gt;% 
   mutate(percent=round(n/total_counties*100,1)) %&gt;% 
-  rename(counties_with_no_projects=n,
-         counties=total_counties) %&gt;% 
+  rename(type=ur,
+         `total counties`=total_counties,
+         `qualified counties with no projects`=n,
+         `counties with projects`=counties_with_projects,
+         `percent counties with no projects`=percent) %&gt;% 
   kable()</code></pre>
 <table>
+<colgroup>
+<col width="10%" />
+<col width="12%" />
+<col width="30%" />
+<col width="19%" />
+<col width="28%" />
+</colgroup>
 <thead>
 <tr class="header">
-<th align="left">ur</th>
-<th align="right">counties</th>
-<th align="right">counties_with_no_projects</th>
-<th align="right">percent</th>
+<th align="left">type</th>
+<th align="right">total counties</th>
+<th align="right">qualified counties with no projects</th>
+<th align="right">counties with projects</th>
+<th align="right">percent counties with no projects</th>
 </tr>
 </thead>
 <tbody>
@@ -743,19 +775,176 @@ mutate(ur=case_when(
 <td align="left">1. Urban</td>
 <td align="right">436</td>
 <td align="right">155</td>
+<td align="right">281</td>
 <td align="right">35.6</td>
 </tr>
 <tr class="even">
 <td align="left">2. Suburban</td>
 <td align="right">730</td>
 <td align="right">228</td>
+<td align="right">502</td>
 <td align="right">31.2</td>
 </tr>
 <tr class="odd">
 <td align="left">3. Rural</td>
 <td align="right">1976</td>
 <td align="right">908</td>
+<td align="right">1067</td>
 <td align="right">46.0</td>
+</tr>
+</tbody>
+</table>
+<p>Southern states wait longer.</p>
+<pre class="r"><code>states &lt;- read_csv(&quot;../../data/raw/states.csv&quot;)
+
+mega_df %&gt;%
+  mutate(fipsStateCode=case_when(
+    nchar(stateNumberCode)==1 ~ paste0(&quot;0&quot;, stateNumberCode),
+    TRUE ~ as.character(stateNumberCode)
+  )) %&gt;%
+  mutate(fipsCountyCode=case_when(
+    nchar(countyCode)==1 ~ paste0(&quot;00&quot;, countyCode),
+    nchar(countyCode)==2 ~ paste0(&quot;0&quot;, countyCode),
+    is.na(countyCode) ~ &quot;000&quot;,
+    TRUE ~ as.character(countyCode)
+  )) %&gt;%
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %&gt;%
+  mutate(year_closed=year(dateClosed)) %&gt;% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %&gt;% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %&gt;% 
+  filter(year(dateClosed)&gt;2010) %&gt;% 
+  left_join(states, by=c(&quot;fipsStateCode&quot;=&quot;st_fips&quot;)) %&gt;% 
+  group_by(region.y) %&gt;% 
+  summarize(total=n(),
+            costs=sum(projectAmount, na.rm=T),
+            months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1)) %&gt;% 
+  arrange(-months_declared_closed) %&gt;% 
+  filter(!is.na(region.y)) %&gt;% 
+  kable()</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">region.y</th>
+<th align="right">total</th>
+<th align="right">costs</th>
+<th align="right">months_declared_closed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">South</td>
+<td align="right">4529</td>
+<td align="right">2986186893</td>
+<td align="right">80.9</td>
+</tr>
+<tr class="even">
+<td align="left">Northeast</td>
+<td align="right">1431</td>
+<td align="right">902396328</td>
+<td align="right">74.4</td>
+</tr>
+<tr class="odd">
+<td align="left">West</td>
+<td align="right">888</td>
+<td align="right">520122488</td>
+<td align="right">73.3</td>
+</tr>
+<tr class="even">
+<td align="left">Midwest</td>
+<td align="right">2415</td>
+<td align="right">1438674982</td>
+<td align="right">58.1</td>
+</tr>
+</tbody>
+</table>
+<p>Specifically West South Central, which consists of Arkansas, Louisiana, Oklahoma, and Texas.</p>
+<pre class="r"><code>mega_df %&gt;%
+  mutate(fipsStateCode=case_when(
+    nchar(stateNumberCode)==1 ~ paste0(&quot;0&quot;, stateNumberCode),
+    TRUE ~ as.character(stateNumberCode)
+  )) %&gt;%
+  mutate(fipsCountyCode=case_when(
+    nchar(countyCode)==1 ~ paste0(&quot;00&quot;, countyCode),
+    nchar(countyCode)==2 ~ paste0(&quot;0&quot;, countyCode),
+    is.na(countyCode) ~ &quot;000&quot;,
+    TRUE ~ as.character(countyCode)
+  )) %&gt;%
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %&gt;%
+  mutate(year_closed=year(dateClosed)) %&gt;% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %&gt;% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %&gt;% 
+  filter(year(dateClosed)&gt;2010) %&gt;% 
+  left_join(states, by=c(&quot;fipsStateCode&quot;=&quot;st_fips&quot;)) %&gt;% 
+  group_by(division) %&gt;% 
+  summarize(total=n(),
+            costs=sum(projectAmount, na.rm=T),
+            months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1)) %&gt;% 
+  arrange(-months_declared_closed) %&gt;% 
+  filter(!is.na(division)) %&gt;% 
+  kable()</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">division</th>
+<th align="right">total</th>
+<th align="right">costs</th>
+<th align="right">months_declared_closed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">West South Central</td>
+<td align="right">1643</td>
+<td align="right">1370051448</td>
+<td align="right">97.8</td>
+</tr>
+<tr class="even">
+<td align="left">Middle Atlantic</td>
+<td align="right">865</td>
+<td align="right">783599758</td>
+<td align="right">77.6</td>
+</tr>
+<tr class="odd">
+<td align="left">Pacific</td>
+<td align="right">546</td>
+<td align="right">375097146</td>
+<td align="right">76.0</td>
+</tr>
+<tr class="even">
+<td align="left">East North Central</td>
+<td align="right">470</td>
+<td align="right">249205028</td>
+<td align="right">75.8</td>
+</tr>
+<tr class="odd">
+<td align="left">East South Central</td>
+<td align="right">1506</td>
+<td align="right">629269697</td>
+<td align="right">74.4</td>
+</tr>
+<tr class="even">
+<td align="left">New England</td>
+<td align="right">566</td>
+<td align="right">118796570</td>
+<td align="right">69.6</td>
+</tr>
+<tr class="odd">
+<td align="left">Mountain</td>
+<td align="right">342</td>
+<td align="right">145025342</td>
+<td align="right">69.1</td>
+</tr>
+<tr class="even">
+<td align="left">South Atlantic</td>
+<td align="right">1380</td>
+<td align="right">986865747</td>
+<td align="right">68.0</td>
+</tr>
+<tr class="odd">
+<td align="left">West North Central</td>
+<td align="right">1945</td>
+<td align="right">1189469954</td>
+<td align="right">53.8</td>
 </tr>
 </tbody>
 </table>

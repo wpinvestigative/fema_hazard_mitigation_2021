@@ -90,6 +90,8 @@ dis <- read_csv("data/raw/DisasterDeclarationsSummaries090321.csv") %>%
 
 # creating array of county geoids
 county_dis <- dis %>%
+  filter(year(declarationDate)>2010) %>%
+#  filter(incidentType!="Biological") %>%
   select(GEOID) %>%
   unique()
 

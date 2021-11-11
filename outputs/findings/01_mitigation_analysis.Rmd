@@ -27,7 +27,7 @@ mega_df <- readRDS("../../data/clean/mega_df_pt2.RDS") %>%
 
 ```
 
-Of the $11 billion FEMA has allocated for this program over the past decade, only $1.5 billion has been spent.
+Of the $11 billion FEMA has allocated for this program over the past decade, only $1.6 billion has been spent.
 
 ```{r one}
 # 1. What percent of money is unspent
@@ -35,8 +35,8 @@ share1 <- mega_df %>%
    filter(programFy>2010) %>%
     filter(programArea=="HMGP") %>%
    group_by(status) %>%
-   summarize(spent=sum(projectAmount, na.rm=T)) %>%
-   mutate(percent_money=round(spent/sum(spent, na.rm=T)*100,1))
+   summarize(amount=sum(projectAmount, na.rm=T)) %>%
+   mutate(percent_money=round(amount/sum(amount, na.rm=T)*100,1))
 
 kable(share1, format.args = list(big.mark = ","))
 ```
@@ -352,9 +352,32 @@ county_projects_disasters %>%
   kable()
 ```
 
-Half of the rural communities that fell in a disaster declared zone aren't getting any Hazard Mitigation Project money.
+Half of all rural counties in the U.S. experienced a disaster over the past 10 years, yet didn't have a single mitigation project.
 
 ```{r no_money}
+
+
+disasters_counties <- read_csv("../../data/raw/DisasterDeclarationsSummaries090321.csv") %>% 
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>% 
+  filter(incidentType=="Biological") %>% 
+  filter(year(declarationDate)>2010) %>% 
+  select(GEOID) %>% 
+  unique()
+
+
+counties_only <- mega_df %>% 
+  filter(year(declarationDate)>2010) %>% 
+  select(GEOID) %>% 
+  unique() %>% 
+  left_join(county_data, by="GEOID") %>% 
+  mutate(ur=case_when(
+      (urban_rural > 0 & urban_rural <= 2) ~ "1. Urban",
+      (urban_rural > 2 & urban_rural <= 4) ~ "2. Suburban",
+      (urban_rural > 4 & urban_rural <= 6) ~ "3. Rural",
+      TRUE ~ "4. Unclassified"
+    )) %>%
+    count(ur, name="counties_with_projects")
+
 no_mitigation <- readRDS("../../data/clean/no_mitigation.RDS")
 county_data_none <- county_data %>%
   mutate(pov_quantile= ntile(pctpov, 4)) %>%
@@ -382,7 +405,6 @@ total_ur <- county_data %>%
 county_data_none %>%
   count(urban_rural) %>% 
   left_join(total_ur) %>% 
-  
 mutate(ur=case_when(
     (urban_rural > 0 & urban_rural <= 2) ~ "1. Urban",
     (urban_rural > 2 & urban_rural <= 4) ~ "2. Suburban",
@@ -392,10 +414,75 @@ mutate(ur=case_when(
   group_by(ur) %>% 
   summarize(total_counties=sum(total_counties),
             n=sum(n)) %>% 
+  left_join(counties_only) %>% 
   filter(ur!="4. Unclassified") %>% 
   mutate(percent=round(n/total_counties*100,1)) %>% 
-  rename(counties_with_no_projects=n,
-         counties=total_counties) %>% 
+  rename(type=ur,
+         `total counties`=total_counties,
+         `qualified counties with no projects`=n,
+         `counties with projects`=counties_with_projects,
+         `percent counties with no projects`=percent) %>% 
   kable()
 
+```
+
+Southern states wait longer.
+
+```{r states}
+states <- read_csv("../../data/raw/states.csv")
+
+mega_df %>%
+  mutate(fipsStateCode=case_when(
+    nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+    TRUE ~ as.character(stateNumberCode)
+  )) %>%
+  mutate(fipsCountyCode=case_when(
+    nchar(countyCode)==1 ~ paste0("00", countyCode),
+    nchar(countyCode)==2 ~ paste0("0", countyCode),
+    is.na(countyCode) ~ "000",
+    TRUE ~ as.character(countyCode)
+  )) %>%
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+  mutate(year_closed=year(dateClosed)) %>% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+  filter(year(dateClosed)>2010) %>% 
+  left_join(states, by=c("fipsStateCode"="st_fips")) %>% 
+  group_by(region.y) %>% 
+  summarize(total=n(),
+            costs=sum(projectAmount, na.rm=T),
+            months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1)) %>% 
+  arrange(-months_declared_closed) %>% 
+  filter(!is.na(region.y)) %>% 
+  kable()
+```
+
+Specifically West South Central, which consists of Arkansas, Louisiana, Oklahoma, and Texas.
+
+```{r states_division}
+
+mega_df %>%
+  mutate(fipsStateCode=case_when(
+    nchar(stateNumberCode)==1 ~ paste0("0", stateNumberCode),
+    TRUE ~ as.character(stateNumberCode)
+  )) %>%
+  mutate(fipsCountyCode=case_when(
+    nchar(countyCode)==1 ~ paste0("00", countyCode),
+    nchar(countyCode)==2 ~ paste0("0", countyCode),
+    is.na(countyCode) ~ "000",
+    TRUE ~ as.character(countyCode)
+  )) %>%
+  mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
+  mutate(year_closed=year(dateClosed)) %>% 
+  mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+  mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
+  filter(year(dateClosed)>2010) %>% 
+  left_join(states, by=c("fipsStateCode"="st_fips")) %>% 
+  group_by(division) %>% 
+  summarize(total=n(),
+            costs=sum(projectAmount, na.rm=T),
+            months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1)) %>% 
+  arrange(-months_declared_closed) %>% 
+  filter(!is.na(division)) %>% 
+  kable()
 ```

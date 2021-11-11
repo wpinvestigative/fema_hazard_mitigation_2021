@@ -1,0 +1,52 @@
+﻿region,st_abbr,st_fips,division
+Northeast,CT,09,New England
+Northeast,ME,23,New England
+Northeast,MA,25,New England
+Northeast,NH,33,New England
+Northeast,RI,44,New England
+Northeast,VT,50,New England
+Northeast,NJ,34,Middle Atlantic
+Northeast,NY,36,Middle Atlantic
+Northeast,PA,42,Middle Atlantic
+Midwest,IN,18,East North Central
+Midwest,IL,17,East North Central
+Midwest,MI,26,East North Central
+Midwest,OH,39,East North Central
+Midwest,WI,55,East North Central
+Midwest,IA,19,West North Central
+Midwest,KS,20,West North Central
+Midwest,MN,27,West North Central
+Midwest,MO,29,West North Central
+Midwest,NE,31,West North Central
+Midwest,ND,38,West North Central
+Midwest,SD,46,West North Central
+South,DE,10,South Atlantic
+South,DC,11,South Atlantic
+South,FL,12,South Atlantic
+South,GA,13,South Atlantic
+South,MD,24,South Atlantic
+South,NC,37,South Atlantic
+South,SC,45,South Atlantic
+South,VA,51,South Atlantic
+South,WV,54,South Atlantic
+South,AL,01,East South Central
+South,KY,21,East South Central
+South,MS,28,East South Central
+South,TN,47,East South Central
+South,AR,05,West South Central
+South,LA,22,West South Central
+South,OK,40,West South Central
+South,TX,48,West South Central
+West,AZ,04,Mountain
+West,CO,08,Mountain
+West,ID,16,Mountain
+West,NM,35,Mountain
+West,MT,30,Mountain
+West,UT,49,Mountain
+West,NV,32,Mountain
+West,WY,56,Mountain
+West,AK,02,Pacific
+West,CA,06,Pacific
+West,HI,15,Pacific
+West,OR,41,Pacific
+West,WA,53,Pacific
