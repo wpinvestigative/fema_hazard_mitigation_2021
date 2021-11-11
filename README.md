@@ -61,7 +61,7 @@ The application can be run locally with the following command in [R Studio](http
 
 ```
 install.packages("shiny", repos="https://cran.rstudio.com/")
-shiny::runGitHub("baseball_spin", "wpinvestigative", ref="main")
+shiny::runGitHub("fema_hazard_mitigation_2021", "wpinvestigative", ref="main")
 ```
 
 **troubleshooting**
