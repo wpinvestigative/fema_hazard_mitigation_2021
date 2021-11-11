@@ -29,15 +29,15 @@ shinyUI(fluidPage(theme=shinytheme("flatly"),
                              sidebarLayout(
                                sidebarPanel(
                                  htmlOutput("state_selector"),
-                                 htmlOutput("county_selector")#,
-                                 #p("How baseball’s war on sticky stuff is already changing the game"),
+                                 htmlOutput("county_selector"),
+                                 p("Disasters that occurred in counties while waiting for FEMA Hazard Mitigation Projects to finish."),
                                  #p("The Washington Post reviewed MLB footage and analyzed nearly 2 million pitches from data provided by Baseball Prospectus since 2017 when spin rates first started being tracked reliably. Details on The Post’s methodology and data can be found on GitHub.")
                                ),
 
                                mainPanel(
 
-                                 plotOutput("top_chart", height="500px"),
-                                 dataTableOutput("top_table")
+                                 plotOutput("top_chart", height="500px")#,
+                                 #dataTableOutput("top_table")
                                ))
                     )
 

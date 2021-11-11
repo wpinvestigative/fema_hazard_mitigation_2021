@@ -24,10 +24,10 @@ library(DT)
 # saveRDS(mega_df, "data/clean/mega_df_shiny.RDS")
 
 #mega_df <- readRDS("data/clean/mega_df_shiny.RDS")
-mega_df <- readRDS("mega_df_shiny.RDS")
+#mega_df <- readRDS("mega_df_shiny.RDS")
 
 #county_data <- readRDS("data/clean/tall_counties_only_2011.RDS") %>%
-county_data <- readRDS("tall_counties_only_2011.RDS") %>%
+county_data <- readRDS("data/clean/tall_counties_only_2011.RDS") %>%
 
   #filter(state!="Puerto Rico") %>%
   filter(state!="Guam") %>%
@@ -134,11 +134,11 @@ shinyServer(function(input, output) {
       annotate("text", x = as.POSIXct("2019-07-20"), y = 1.5, label = "Disaster", size=3, colour="orange") #+
   })
 
-  output$top_table <- renderDataTable(
+  #output$top_table <- renderDataTable(
     #table_df=table_df()
-    mega_df %>%
-      filter(state==input$state) %>%
-      filter(county==input$county)
-  )
+  #  mega_df %>%
+  #    filter(state==input$state) %>%
+  #    filter(county==input$county)
+  #)
 
 })

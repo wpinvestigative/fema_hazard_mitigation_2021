@@ -28,7 +28,7 @@ The data was pulled from OpenFEMA.
 
 * **[data/raw_data](data/raw)** - Downloaded data from the OpenFEMA
 
-* **[scripts/import](scripts/analysis)** - Scripts to prepare FEMA data and exploratory analysis
+* **[scripts/import](scripts/import)** - Scripts to prepare FEMA data and exploratory analysis
 
 * **[outputs/findings](https://github.com/wpinvestigative/fema_hazard_mitigation_2021/tree/main/outputs/findings)** - Exploratory notebook
 
@@ -38,3 +38,41 @@ The data was pulled from OpenFEMA.
 
 * [Analysis](http://wpinvestigative.github.io/fema_hazard_mitigation_2021/outputs/findings/01_mitigation_analysis.html) - Methodology and analysis for story
 
+
+# Explorer app
+
+![](shiny.png)
+
+
+To run the app, you must have [R version 3.5 or later](https://cloud.r-project.org/) installed first.
+
+**Via terminal**
+
+After you've installed R, In the terminal, run
+
+```
+R -e "install.packages('shiny', repos='https://cran.rstudio.com/')"
+R -e "shiny::runGitHub('fema_hazard_mitigation_2021', 'wpinvestigative', ref="main", launch.browser=TRUE)"
+```
+
+**Via RStudio**
+
+The application can be run locally with the following command in [R Studio](https://www.rstudio.com/products/rstudio/download/#download): 
+
+```
+install.packages("shiny", repos="https://cran.rstudio.com/")
+shiny::runGitHub("baseball_spin", "wpinvestigative", ref="main")
+```
+
+**troubleshooting**
+
+If you have connectivity issues, you may need to preinstall some packages:
+
+```
+# run these lines in RStudio console
+
+packages <- c("tidyverse", "shiny", "shinyWidgets", "lubridate", "shinythemes", "DT")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())), repos = "https://cran.us.r-project.org")  
+}
+```
