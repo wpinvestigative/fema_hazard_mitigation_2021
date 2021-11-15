@@ -13,6 +13,7 @@ library(lubridate)
 library(DT)
 library(knitr)
 library(viridis)
+library(scales)
 
 knitr::opts_chunk$set(warning = FALSE)
 knitr::opts_chunk$set(message = FALSE)
@@ -32,8 +33,10 @@ Of the $11 billion FEMA has allocated for this program over the past decade, onl
 ```{r one}
 # 1. What percent of money is unspent
 share1 <- mega_df %>%
-   filter(programFy>2010) %>%
-    filter(programArea=="HMGP") %>%
+   #filter(programFy>2010) %>%
+   mutate(year_declared=year(declarationDate)) %>%
+   filter(year_declared>2010) %>% 
+   filter(programArea=="HMGP") %>%
    group_by(status) %>%
    summarize(amount=sum(projectAmount, na.rm=T)) %>%
    mutate(percent_money=round(amount/sum(amount, na.rm=T)*100,1))
@@ -138,16 +141,21 @@ mega_df %>%
      )) %>%
      mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
     mutate(year_closed=year(dateClosed)) %>% 
+    #mutate(disaster_closed_interval=interval(declarationDate, approval_date)) %>% 
     mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
     mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
-     left_join(county_data, by="GEOID") %>%
-     filter(year_closed>2010) %>% 
+    left_join(county_data, by="GEOID") %>%
+    #filter(year(approval_date)>2010) %>%    
+    filter(year_closed>2010) %>% 
      group_by(pov_quantile) %>%
      summarize(total=n(),
                costs=sum(projectAmount, na.rm=T),
                months_declared_closed=round(mean(months_disaster_closed, na.rm=T),1))  %>% 
+  filter(!is.na(pov_quantile)) %>% 
   kable()
 ```
+
+
 
 How long it takes to close out projects in counties where majority of the population is either white or non-white.
 
@@ -166,11 +174,13 @@ mega_df %>%
      )) %>%
     mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
     mutate(year_closed=year(dateClosed)) %>% 
-    mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    mutate(disaster_closed_interval=interval(declarationDate, approval_date)) %>% 
+    #mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
     mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
     select(-majority) %>% 
     left_join(county_data, by="GEOID") %>%
-    filter(year_closed>2010) %>% 
+    filter(year(approval_date)>2010) %>% 
+#    filter(year_closed>2010) %>% 
     group_by(majority) %>%
     summarize(total=n(),
                costs=sum(projectAmount, na.rm=T),
@@ -195,12 +205,15 @@ tenplus <- mega_df %>%
      )) %>%
     mutate(GEOID=paste0(fipsStateCode, fipsCountyCode)) %>%
     mutate(year_closed=year(dateClosed)) %>% 
-    mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    #mutate(disaster_closed_interval=interval(declarationDate, dateClosed)) %>% 
+    mutate(disaster_closed_interval=interval(declarationDate, approval_date)) %>% 
     mutate(months_disaster_closed=disaster_closed_interval %/% months(1)) %>% 
     select(-majority) %>% 
     left_join(county_data, by="GEOID") %>%
     filter(months_disaster_closed>120) %>% 
-    filter(year_closed>2010)
+  mutate(year_approved=year(approval_date)) %>% 
+  filter(year_approved>2010)
+  #filter(year_closed>2010)
 
 # Counties with at least one project that took longer than 10 years to close out
 tenplus %>% 
@@ -266,10 +279,53 @@ mega_df %>%
   filter(subappType!="Planning") %>%
   filter(programFy>2010) %>%
   group_by(incidentType) %>%
-  summarize(average_disaster_count=mean(incident_count, na.rm=T)) %>%
+  summarize(average_disaster_count=round(mean(incident_count, na.rm=T),1)) %>%
   arrange(-average_disaster_count) %>% 
   head(3) %>% 
   kable()
+
+
+#Hurricane
+hurricanes <- 
+     mega_df %>%
+     filter(subappType!="Management Costs") %>%
+     filter(subappType!="Planning") %>%
+     filter(programFy>2010) %>% filter(incidentType=="Hurricane")
+
+stc <- mega_df %>% 
+  filter(year(approval_date)>2010) %>% 
+  filter(county=="St. Charles")
+#Fire
+
+#Severe Ice Storm
+ice <- 
+     mega_df %>%
+     filter(subappType!="Management Costs") %>%
+     filter(subappType!="Planning") %>%
+     filter(programFy>2010) %>% filter(incidentType=="Severe Ice Storm")
+# too many are still open
+
+#Flood
+Flood <- 
+     mega_df %>%
+     filter(subappType!="Management Costs") %>%
+     filter(subappType!="Planning") %>%
+     filter(programFy>2010) %>% filter(incidentType=="Flood")
+
+
+#Tornado
+tornados <- 
+     mega_df %>%
+     filter(subappType!="Management Costs") %>%
+     filter(subappType!="Planning") %>%
+     filter(programFy>2010) %>% filter(incidentType=="Tornado")
+
+typh<- 
+     mega_df %>%
+     filter(subappType!="Management Costs") %>%
+     filter(subappType!="Planning") %>%
+     filter(programFy>2010) %>% filter(incidentType=="Typhoon")
+
 ```
 
 Disasters compared to projects by county type.
@@ -346,7 +402,15 @@ Urban counties are twice as likely on average to receive funding after a disaste
 
 ```{r ratio}
 county_projects_disasters %>% 
-  mutate(ratio=projects/disasters) %>% 
+  mutate(projects2=case_when(
+    is.na(projects) ~ 0,
+    TRUE ~ as.numeric(projects)
+  ),
+  disasters2=case_when(
+    is.na(disasters) ~ 0,
+    TRUE ~ as.numeric(disasters)
+  )) %>% 
+  mutate(ratio=projects2/disasters2) %>% 
   group_by(ur) %>% 
   summarize(average_ratio = mean(ratio, na.rm=T)) %>% 
   kable()

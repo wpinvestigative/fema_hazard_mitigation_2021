@@ -2,13 +2,13 @@
 
 # About this story
 
-[TK TK ](https://www.washingtonpost.com/)
+[The Ring in Ashes](https://www.washingtonpost.com/nation/2021/11/15/fema-hazard-mitigation-funding/)
 
-Summary TK
+As natural disasters worsen, President Biden is directing FEMA to shift more of its efforts to preventing them. This work was always a small part of the agency’s role, but now Biden has committed an unprecedented $5 billion in new funding to minimize future disasters, and Congress designated several billion dollars more in its recently passed infrastructure bill.
 
 # Methodology
 
-The Post cleaned FEMA's Hazard Mitigation Assistance Projects data and joined it with FEMA's Disaster Declarations Summaries data to determine which designated disasters occurred between three time periods 
+The analysis done by The Post can be reproduced using FEMA's Hazard Mitigation Assistance Projects open data and joined with with FEMA's Disaster Declarations Summaries data to determine which designated disasters occurred between three time periods 
 
 * declared disaster date and approval date 
 
@@ -18,7 +18,7 @@ The Post cleaned FEMA's Hazard Mitigation Assistance Projects data and joined it
 
 # About the data
 
-The data was pulled from OpenFEMA.
+The data for the purpose of sharing methodology was pulled from OpenFEMA.
 
 * [Hazard Mitigation Assistance Projects - v2*](https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-v2)
 

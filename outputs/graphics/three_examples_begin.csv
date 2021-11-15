@@ -1,0 +1,21 @@
+femaDeclarationString,designatedArea,disasterNumber,state,incidentBeginDate,fyDeclared,incidentType
+DR-4080-LA,St. Charles (Parish),4080,LA,2012-08-26T00:00:00Z,2012,Hurricane
+DR-4345-LA,St. Charles (Parish),4345,LA,2017-08-28T08:09:00Z,2018,Hurricane
+EM-3392-LA,St. Charles (Parish),3392,LA,2017-10-05T15:34:00Z,2018,Hurricane
+DR-4458-LA,St. Charles (Parish),4458,LA,2019-07-10T08:00:00Z,2019,Hurricane
+EM-3538-LA,St. Charles (Parish),3538,LA,2020-08-22T00:00:00Z,2020,Hurricane
+DR-4559-LA,St. Charles (Parish),4559,LA,2020-08-22T08:00:00Z,2020,Hurricane
+EM-3543-LA,St. Charles (Parish),3543,LA,2020-09-13T09:25:44Z,2020,Hurricane
+EM-3547-LA,St. Charles (Parish),3547,LA,2020-10-06T08:00:00Z,2021,Hurricane
+DR-4570-LA,St. Charles (Parish),4570,LA,2020-10-06T08:00:00Z,2021,Hurricane
+EM-3549-LA,St. Charles (Parish),3549,LA,2020-10-26T08:00:00Z,2021,Hurricane
+DR-4577-LA,St. Charles (Parish),4577,LA,2020-10-26T08:00:00Z,2021,Hurricane
+EM-3568-LA,St. Charles (Parish),3568,LA,2021-08-26T08:00:00Z,2021,Hurricane
+DR-4611-LA,St. Charles (Parish),4611,LA,2021-08-26T08:00:00Z,2021,Hurricane
+DR-1981-ND,Barnes (County),1981,ND,2011-02-14T00:00:00Z,2011,Flood
+DR-4444-ND,Barnes (County),4444,ND,2019-03-21T00:00:00Z,2019,Flood
+DR-4475-ND,Barnes (County),4475,ND,2019-10-09T00:00:00Z,2020,Flood
+DR-4553-ND,Barnes (County),4553,ND,2020-04-01T00:00:00Z,2020,Flood
+DR-4575-OK,Lincoln (County),4575,OK,2020-10-26T08:00:00Z,2021,Severe Ice Storm
+DR-4587-OK,Lincoln (County),4587,OK,2021-02-08T08:25:00Z,2021,Severe Ice Storm
+EM-3555-OK,Lincoln (County),3555,OK,2021-02-08T11:25:00Z,2021,Severe Ice Storm
