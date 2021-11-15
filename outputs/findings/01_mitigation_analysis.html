@@ -9,6 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="Andrew Ba Tran" />
 
 
 <title>FEMA Hazard Mitigation projects analysis</title>
@@ -176,10 +177,12 @@ pre code {
 
 
 <h1 class="title toc-ignore">FEMA Hazard Mitigation projects analysis</h1>
+<h4 class="author">Andrew Ba Tran</h4>
 
 </div>
 
 
+<p>The analysis done by The Post for the story <a href="https://www.washingtonpost.com/nation/2021/11/15/fema-hazard-mitigation-funding/">The Ring in Ashes</a> can be reproduced using FEMA’s <a href="(https://www.fema.gov/openfema-data-page/hazard-mitigation-assistance-projects-v2)">Hazard Mitigation Assistance Projects</a> open data and joined with with FEMA’s <a href="(https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2)">Disaster Declarations Summaries</a> data to determine which designated disasters occurred between three time periods</p>
 <pre class="r"><code>library(tidyverse)
 library(tidycensus)
 library(lubridate)
